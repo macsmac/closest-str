@@ -39,7 +39,9 @@ module.exports = {
 	 	return (longerLength - this._editDistance(longer, shorter)) / parseFloat(longerLength);
 	},
 	setdict: function(dict) {
-		this.__dict = Object.keys(dict).map(k => ({
+		if (dict instanceof Array) this.__dict = dict;
+		else if (typeof dict == "string") this.setdict(require(dict));
+		else this.__dict = Object.keys(dict).map(k => ({
 			query: k,
 			answer: dict[k]
 		}));
@@ -48,17 +50,34 @@ module.exports = {
 		if (typeof query !== "number") this.__lowresponse = query;
 		else this.__low = query;
 	},
-	request: function(query) {
+	setmax: function(max) {
+		this.__max = max;
+	},
+	request: function(query, params) {
 		var _this = this;
-		var biggestPrecent = 0;
+		var biggestPrecent = -1;
 		var response = null;
-		this.__dict.forEach(function(el) {
+		var max, low, lowresponse, skip;
+		if (params) {
+			low = params.low == null ? this.__low : params.low;
+			max = params.max == null ? this.__max : params.max;
+			lowresponse = params.lowresponse == null ? this.__lowresponse : params.lowresponse;
+			skip = params.skip || 0;
+		} else {
+			max = this.__max;
+			low = this.__low;
+			skip = 0;
+			lowresponse = this.__lowresponse;
+		}
+		for (var i = skip; i < this.__dict.length; i++) {
+			var el = this.__dict[i];
 			var precent = _this._similarity(el.query, query);
 			if (precent > biggestPrecent) {
 				biggestPrecent = precent;
 				response = el;
 			}
-		});
-		return (this.__lowresponse && biggestPrecent < this.__low ? { query: null, answer: this.__lowresponse } : response);
+			if (precent >= max) break;
+		}
+		return (lowresponse && biggestPrecent < low ? { query: null, answer: lowresponse } : response);
 	}
 }
